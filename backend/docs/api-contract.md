@@ -2,10 +2,23 @@
 
 **Version:** 1.1 (reviewed integration contract)  
 **Backend:** AWS Lambda (Python) + DynamoDB  
-**API exposure:** AWS API Gateway (not yet configured or end-to-end tested)  
-**Base URL:** Not available yet. API Gateway has not been configured. Riddhi must use the actual invoke URL after deployment; no URL is supplied or assumed here.
+**API exposure:** AWS API Gateway (HTTP API, deployed and tested)
 
-This document describes the **current deployed Lambda behavior** as supplied by the backend developer. It does not imply that API Gateway, CORS, or frontend integration is already working.
+**API Name:** CloudIncident-API
+
+**AWS Region:** us-east-1 (N. Virginia)
+
+**Stage:** $default (Auto-deploy enabled)
+
+**Base URL:** https://wdzl2351ua.execute-api.us-east-1.amazonaws.com
+
+**CORS:** Configured for GET, POST, PATCH, and OPTIONS.
+
+**Integration:** API Gateway → AWS Lambda → DynamoDB
+
+**Testing Status:** All five API endpoints successfully tested through API Gateway.
+
+This document describes the deployed CloudIncident backend and its API Gateway integration. All five API endpoints have passed initial live HTTP tests. CORS has been configured, but integration with the React frontend is still pending.
 
 ## 1. Common conventions
 
@@ -265,18 +278,20 @@ The existing React app's `frontend/src/services/incidentService.js` can adapt ba
 3. For PATCH, convert `assignee` → `assignedTo`; omit `updatedBy` and other unsupported keys. Ensure the admin UI permits only the allowed next status, and sends required assignment/resolution remarks.
 4. For POST, send the six documented fields; normalize the returned full incident object before using it in React.
 5. For GET `/stats`, use the updated `data` structure; if a dashboard card groups Resolved + Closed, compute `data.resolved + data.closed` in the frontend. Category and priority breakdowns are available in `categoryCounts` and `priorityCounts`.
-6. When API Gateway is configured, set the actual base URL, switch off mock mode, and confirm CORS preflight for `POST` and `PATCH` as well as `GET`. Do not put AWS credentials in Vite environment variables.
+6. Use the deployed API Gateway base URL, set the actual base URL, switch off mock mode, and confirm CORS preflight for `POST` and `PATCH` as well as `GET`. Do not put AWS credentials in Vite environment variables.
 7. Test an incident end to end: create → list → details → assign → in progress → resolve → close → dashboard updates.
 
 ## 9. Integration decisions / not yet verified
 
-- API Gateway deployment, base URL, route mapping, proxy integration, permissions, and CORS are **pending**.
-- Decide which AWS Academy account will host the integrated backend/API Gateway.
+- API Gateway is deployed in the backend developer's AWS Academy Learner Lab account.
+- All five routes have passed initial HTTP integration tests.
+- CORS is configured; browser-based frontend integration testing is pending.
+- Frontend integration and end-to-end application testing remain pending.
 - Authentication, authorization, rate limiting, and concurrency-safe updates are **not implemented or not verified** in the supplied handlers; do not treat this as a production-ready public API.
 - The exact success-message strings for GET-list and GET-by-ID remain unverified. Their examples explicitly say so; do not treat those illustrative strings as actual backend output. Clients should rely on `success` and `data`, not message equality.
 
 ---
 
-**Verification:** No template tokens remain. The API Gateway URL is intentionally unspecified because it has not been deployed; GET success-message wording is explicitly unverified. The response examples contain illustrative data, not claims of live API output.
+**Verification:** All five API endpoints have passed initial live HTTP tests through AWS API Gateway. The base URL and route mappings are confirmed. Sample incident IDs, timestamps, and statistics in this document are illustrative. Frontend integration and browser-based CORS verification remain pending.
 
 **Contract principle:** The deployed backend is the source of truth. Frontend-specific naming is handled in the React service adapter, not by renaming DynamoDB attributes.
