@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Cloud, Server, Shield, Sparkles } from 'lucide-react';
 
 export default function Footer({ onOpenApiModal }) {
   return (
@@ -11,8 +10,14 @@ export default function Footer({ onOpenApiModal }) {
           {/* Brand & Project Info */}
           <div className="md:col-span-2 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#651F2B] border border-[#7A2B39] flex items-center justify-center text-[#EAC4CF]">
-                <Cloud className="w-4 h-4" />
+              <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                <img
+                  src="/cloudincident-icon.svg"
+                  alt="CloudIncident Logo"
+                  className="w-full h-full object-contain"
+                  width="32"
+                  height="32"
+                />
               </div>
               <span className="font-display text-2xl tracking-wider text-white">
                 CLOUDIN<span className="text-[#EAC4CF]">CIDENT</span>

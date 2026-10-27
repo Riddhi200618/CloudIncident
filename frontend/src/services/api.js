@@ -25,14 +25,16 @@ export async function apiClient(endpoint, options = {}) {
 
   if (!response.ok) {
     let errorDetail = `HTTP ${response.status} ${response.statusText}`;
+    let errorData = null;
     try {
-      const errorJson = await response.json();
-      errorDetail = errorJson.message || errorJson.error || errorDetail;
+      errorData = await response.json();
+      errorDetail = errorData.message || errorData.error || errorDetail;
     } catch {
       // Non-JSON error payload
     }
     const error = new Error(errorDetail);
     error.status = response.status;
+    error.data = errorData;
     throw error;
   }
 

@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" fill="none" width="100%" height="100%">
+  <defs>
+    <filter id="doc-shadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#24191A" flood-opacity="0.2" />
+    </filter>
+  </defs>
+
+  <!-- Group: Top Icon -->
+  <g transform="translate(100, 16)">
+    <!-- 1. Background Cloud Puff (Blush / Dusty Rose) -->
+    <path
+      d="M 120 54
+         C 120 36 136 26 154 28
+         C 170 30 180 44 178 58
+         C 188 64 190 78 182 88
+         C 174 98 160 100 146 100
+         L 120 100 Z"
+      fill="#EAC4CF"
+    />
+
+    <!-- 2. Main Foreground Cloud (Deep Burgundy) -->
+    <path
+      d="M 38 100
+         C 22 100 14 88 16 74
+         C 18 62 30 54 44 54
+         C 46 36 64 24 88 24
+         C 110 24 126 34 134 52
+         C 146 52 160 62 160 76
+         C 160 90 148 100 132 100
+         Z"
+      fill="#501B24"
+    />
+
+    <!-- Cloud Contour Accent -->
+    <path
+      d="M 32 70
+         C 34 58 44 52 54 52
+         C 56 40 70 30 90 30
+         C 102 30 112 34 120 44
+         C 112 38 100 34 88 34
+         C 68 34 54 44 50 60
+         C 38 60 32 66 30 74
+         C 30 72 31 71 32 70 Z"
+      fill="#7A2B39"
+      opacity="0.95"
+    />
+
+    <!-- Cloud Base Shadow -->
+    <path
+      d="M 22 88
+         C 28 97 40 100 54 100
+         L 132 100
+         C 144 100 154 94 156 84
+         C 150 93 138 97 126 97
+         L 44 97
+         C 34 97 26 92 22 88 Z"
+      fill="#3D131B"
+      opacity="0.7"
+    />
+
+    <!-- 3. Incident Report Document (Cream) -->
+    <g filter="url(#doc-shadow)">
+      <rect
+        x="66"
+        y="34"
+        width="56"
+        height="72"
+        rx="12"
+        fill="#FAF5EE"
+        stroke="#DFB0BD"
+        stroke-width="1.8"
+      />
+      <!-- Document Text Lines -->
+      <rect x="78" y="50" width="28" height="5" rx="2.5" fill="#501B24" />
+      <rect x="78" y="60" width="22" height="5" rx="2.5" fill="#651F2B" />
+      <rect x="78" y="70" width="14" height="5" rx="2.5" fill="#7A2B39" />
+    </g>
+
+    <!-- 4. Prominent Alert Badge (Circle with Exclamation) -->
+    <g filter="url(#doc-shadow)">
+      <circle
+        cx="116"
+        cy="86"
+        r="20"
+        fill="#501B24"
+        stroke="#FAF5EE"
+        stroke-width="2.5"
+      />
+      <circle
+        cx="116"
+        cy="86"
+        r="17.5"
+        fill="#651F2B"
+      />
+      <!-- Exclamation Mark -->
+      <path
+        d="M 116 75
+           L 116 87"
+        stroke="#FAF5EE"
+        stroke-width="4"
+        stroke-linecap="round"
+      />
+      <circle
+        cx="116"
+        cy="94"
+        r="2.2"
+        fill="#FAF5EE"
+      />
+    </g>
+  </g>
+
+  <!-- Typography: Wordmark -->
+  <!-- CLOUDINCIDENT -->
+  <text
+    x="200"
+    y="190"
+    text-anchor="middle"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="36"
+    letter-spacing="0.5"
+  >
+    <tspan fill="#501B24">CLOUD</tspan><tspan fill="#B85D6F">INCIDENT</tspan>
+  </text>
+
+  <!-- CAMPUS INCIDENT OPS -->
+  <text
+    x="200"
+    y="218"
+    text-anchor="middle"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-weight="700"
+    font-size="11.5"
+    fill="#501B24"
+    letter-spacing="8"
+    opacity="0.9"
+  >
+    CAMPUS INCIDENT OPS
+  </text>
+</svg>

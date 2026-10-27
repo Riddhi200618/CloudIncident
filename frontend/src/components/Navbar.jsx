@@ -8,7 +8,6 @@ import {
   Menu,
   X,
   Server,
-  Sparkles,
 } from 'lucide-react';
 import { useIncidents } from '../context/IncidentContext';
 
@@ -55,22 +54,17 @@ export default function Navbar({ onOpenApiModal }) {
             to="/"
             onClick={closeMenu}
             className="flex items-center gap-2.5 sm:gap-3 group focus:outline-none flex-shrink-0"
+            aria-label="CloudIncident - Campus Incident Ops Home"
           >
-            {/* Custom Abstract Editorial Brand Mark */}
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#501B24] border border-[#651F2B] flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200 flex-shrink-0">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5 text-[#EAC4CF]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
-                <path d="M12 12v4" />
-                <path d="M12 19h.01" />
-              </svg>
+            {/* CloudIncident Brand Icon */}
+            <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+              <img
+                src="/cloudincident-icon.svg"
+                alt="CloudIncident Logo"
+                className="w-full h-full object-contain"
+                width="44"
+                height="44"
+              />
             </div>
 
             <div className="flex flex-col">
