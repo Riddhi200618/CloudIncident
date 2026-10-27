@@ -1,49 +1,120 @@
-import { apiClient, USE_MOCK_DATA } from './api';
-import { INITIAL_INCIDENTS } from '../data/mockIncidents';
+import { apiClient, USE_MOCK_DATA } from './api.js';
+import { INITIAL_INCIDENTS } from '../data/mockIncidents.js';
 
 const LOCAL_STORAGE_KEY = 'cloudincident_records_v1';
 
+export const STATUS_LIFECYCLE = [
+  'Open',
+  'Assigned',
+  'In Progress',
+  'Resolved',
+  'Closed',
+];
+
 /**
- * Normalizes incident objects to bridge frontend UI conventions (`id`, `assignee`)
- * and backend DynamoDB data model specifications (`incidentId`, `assignedTo`).
+ * Unwraps `{ success, message, data }` backend response envelope,
+ * returning the inner `data` payload while gracefully handling flat responses.
+ */
+export function unwrapResponse(response) {
+  if (response && typeof response === 'object' && 'data' in response && 'success' in response) {
+    return response.data;
+  }
+  return response;
+}
+
+/**
+ * Normalizes incident objects to bridge frontend UI conventions (`id`, `assignee`, timeline `note`/`actor`)
+ * and backend DynamoDB data model specifications (`incidentId`, `assignedTo`, timeline `remarks`).
  */
 export function normalizeIncident(incident) {
   if (!incident || typeof incident !== 'object') return incident;
+  
   const id = incident.incidentId || incident.id || '';
-  const assignedTo = incident.assignedTo || incident.assignee || 'Unassigned';
+  const rawAssignedTo = incident.assignedTo !== undefined ? incident.assignedTo : incident.assignee;
+  const assignedTo = typeof rawAssignedTo === 'string' ? rawAssignedTo : '';
+  const assignee = assignedTo.trim() ? assignedTo.trim() : 'Unassigned';
+
+  const rawTimeline = Array.isArray(incident.timeline) ? incident.timeline : [];
+  const normalizedTimeline = rawTimeline.map((entry) => {
+    if (!entry || typeof entry !== 'object') return entry;
+    const note = entry.note || entry.remarks || '';
+    const remarks = entry.remarks || entry.note || '';
+    return {
+      ...entry,
+      note,
+      remarks,
+      actor: entry.actor || 'System',
+      status: entry.status || incident.status || 'Open',
+      timestamp: entry.timestamp || incident.updatedAt || incident.createdAt || '',
+    };
+  });
+
   return {
     ...incident,
     id,
     incidentId: id,
-    assignee: assignedTo,
     assignedTo,
-    timeline: Array.isArray(incident.timeline) ? incident.timeline : [],
+    assignee,
+    timeline: normalizedTimeline,
   };
 }
+
+/**
+ * Filters an incident array in-memory
+ */
+function filterIncidents(items, filters = {}) {
+  if (!filters || typeof filters !== 'object') return items;
+  return items.filter((item) => {
+    if (filters.status && filters.status !== 'All' && item.status !== filters.status) return false;
+    if (filters.category && filters.category !== 'All' && item.category !== filters.category) return false;
+    if (filters.priority && filters.priority !== 'All' && item.priority !== filters.priority) return false;
+    if (filters.search) {
+      const q = filters.search.toLowerCase().trim();
+      const match =
+        (item.id && item.id.toLowerCase().includes(q)) ||
+        (item.incidentId && item.incidentId.toLowerCase().includes(q)) ||
+        (item.title && item.title.toLowerCase().includes(q)) ||
+        (item.location && item.location.toLowerCase().includes(q)) ||
+        (item.reportedBy && item.reportedBy.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+    return true;
+  });
+}
+
+let inMemoryStore = null;
 
 /**
  * Initialize or retrieve incidents from localStorage for client mock testing
  */
 function getLocalStore() {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_INCIDENTS));
-      return INITIAL_INCIDENTS;
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (!raw) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_INCIDENTS));
+        return INITIAL_INCIDENTS;
+      }
+      return JSON.parse(raw);
     }
-    return JSON.parse(raw);
   } catch (err) {
     console.warn('LocalStorage access issue, falling back to in-memory incidents', err);
-    return INITIAL_INCIDENTS;
   }
+  if (!inMemoryStore) {
+    inMemoryStore = JSON.parse(JSON.stringify(INITIAL_INCIDENTS));
+  }
+  return inMemoryStore;
 }
 
 function saveLocalStore(incidents) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(incidents));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(incidents));
+    }
   } catch (err) {
     console.warn('Failed to save to localStorage', err);
   }
+  inMemoryStore = incidents;
 }
 
 /**
@@ -54,30 +125,24 @@ function saveLocalStore(incidents) {
  */
 export const incidentService = {
   /**
-   * Fetch all incidents (supports optional filter query parameters)
-   * Prepares for: GET /incidents(?status=...&category=...&priority=...&search=...)
+   * Fetch all incidents (supports optional filter query parameters applied client-side)
+   * Prepares for: GET /incidents
    */
   async getIncidents(filters = {}) {
     if (!USE_MOCK_DATA) {
-      const queryParams = new URLSearchParams();
-      if (filters && typeof filters === 'object') {
-        if (filters.status && filters.status !== 'All') queryParams.set('status', filters.status);
-        if (filters.category && filters.category !== 'All') queryParams.set('category', filters.category);
-        if (filters.priority && filters.priority !== 'All') queryParams.set('priority', filters.priority);
-        if (filters.search) queryParams.set('search', filters.search);
-      }
-      const qs = queryParams.toString();
-      const endpoint = qs ? `/incidents?${qs}` : '/incidents';
-      const response = await apiClient(endpoint, { method: 'GET' });
-      const items = Array.isArray(response)
-        ? response
-        : response?.incidents || response?.items || [];
-      return items.map(normalizeIncident);
+      const response = await apiClient('/incidents', { method: 'GET' });
+      const data = unwrapResponse(response);
+      const items = Array.isArray(data)
+        ? data
+        : data?.incidents || data?.items || [];
+      const normalized = items.map(normalizeIncident);
+      return filterIncidents(normalized, filters);
     }
     // Simulate brief network latency for realistic UX feel
     await new Promise((r) => setTimeout(r, 120));
     const items = getLocalStore();
-    return items.map(normalizeIncident);
+    const normalized = items.map(normalizeIncident);
+    return filterIncidents(normalized, filters);
   },
 
   /**
@@ -87,7 +152,9 @@ export const incidentService = {
   async getIncidentById(id) {
     if (!USE_MOCK_DATA) {
       const response = await apiClient(`/incidents/${encodeURIComponent(id)}`, { method: 'GET' });
-      return normalizeIncident(response);
+      const data = unwrapResponse(response);
+      const item = data?.incident || data?.item || data;
+      return normalizeIncident(item);
     }
     await new Promise((r) => setTimeout(r, 100));
     const items = getLocalStore();
@@ -105,65 +172,64 @@ export const incidentService = {
   /**
    * Create new incident
    * Prepares for: POST /incidents
+   * Request body includes ONLY the 6 backend-required fields:
+   * title, description, category, location, priority, reportedBy
    */
   async createIncident(incidentData) {
     if (!USE_MOCK_DATA) {
       const payload = {
-        title: incidentData.title?.trim(),
-        description: incidentData.description?.trim(),
-        category: incidentData.category || 'Other',
-        location: incidentData.location?.trim(),
+        title: incidentData.title?.trim() || '',
+        description: incidentData.description?.trim() || '',
+        category: incidentData.category?.trim() || 'Other',
+        location: incidentData.location?.trim() || '',
         priority: incidentData.priority || 'Medium',
-        reportedBy: incidentData.reportedBy?.trim(),
-        ...(incidentData.assignedTo || incidentData.assignee
-          ? {
-              assignedTo: incidentData.assignedTo || incidentData.assignee,
-              assignee: incidentData.assignedTo || incidentData.assignee,
-            }
-          : {}),
+        reportedBy: incidentData.reportedBy?.trim() || '',
       };
       const response = await apiClient('/incidents', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      return normalizeIncident(response);
+      const data = unwrapResponse(response);
+      const item = data?.incident || data?.item || data;
+      return normalizeIncident(item);
     }
     await new Promise((r) => setTimeout(r, 200));
     const items = getLocalStore();
     
-    // Generate new ID (e.g. INC-1049)
-    const existingIds = items
-      .map((i) => {
-        const idVal = i.incidentId || i.id || '';
-        const match = idVal.match(/INC-(\d+)/i);
-        return match ? parseInt(match[1], 10) : 0;
-      })
-      .filter((n) => !isNaN(n));
-    const nextNum = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1001;
-    const newId = `INC-${nextNum}`;
+    // Generate new UUID-based ID matching backend pattern: INC-<uuid>
+    const uuidPart =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+    const newId = `INC-${uuidPart}`;
 
     const now = new Date().toISOString();
     const newIncident = {
-      id: newId,
       incidentId: newId,
-      title: incidentData.title.trim(),
-      description: incidentData.description.trim(),
-      category: incidentData.category || 'Other',
-      location: incidentData.location.trim(),
+      id: newId,
+      title: (incidentData.title || '').trim(),
+      description: (incidentData.description || '').trim(),
+      category: (incidentData.category || 'Other').trim(),
+      location: (incidentData.location || '').trim(),
       priority: incidentData.priority || 'Medium',
+      reportedBy: (incidentData.reportedBy || '').trim(),
+      assignedTo: '',
+      assignee: 'Unassigned',
       status: 'Open',
-      reportedBy: incidentData.reportedBy.trim(),
-      assignee: incidentData.assignedTo || incidentData.assignee || 'Unassigned',
-      assignedTo: incidentData.assignedTo || incidentData.assignee || 'Unassigned',
       createdAt: now,
       updatedAt: now,
       resolutionRemarks: '',
       timeline: [
         {
-          timestamp: now,
           status: 'Open',
-          actor: incidentData.reportedBy.trim(),
-          note: 'Incident logged and queued for evaluation.',
+          timestamp: now,
+          remarks: 'Incident reported',
+          note: 'Incident reported',
+          actor: 'System',
         },
       ],
     };
@@ -176,21 +242,37 @@ export const incidentService = {
   /**
    * Update incident (Status, Assignee, Remarks)
    * Prepares for: PATCH /incidents/{id}
+   * Request body includes ONLY: status, assignedTo, resolutionRemarks
    */
   async updateIncident(id, patchData) {
     if (!USE_MOCK_DATA) {
-      const payload = { ...patchData };
-      if (payload.assignee && !payload.assignedTo) {
-        payload.assignedTo = payload.assignee;
+      const payload = {};
+      if (patchData.status) {
+        payload.status = patchData.status;
       }
-      if (payload.assignedTo && !payload.assignee) {
-        payload.assignee = payload.assignedTo;
+      if (patchData.assignedTo !== undefined || patchData.assignee !== undefined) {
+        const raw = patchData.assignedTo !== undefined ? patchData.assignedTo : patchData.assignee;
+        if (typeof raw === 'string') {
+          payload.assignedTo = raw.trim();
+        }
       }
+      if (patchData.resolutionRemarks !== undefined) {
+        if (typeof patchData.resolutionRemarks === 'string') {
+          payload.resolutionRemarks = patchData.resolutionRemarks.trim();
+        }
+      }
+
+      if (Object.keys(payload).length === 0) {
+        throw new Error('At least one field (status, assignedTo, resolutionRemarks) is required for update');
+      }
+
       const response = await apiClient(`/incidents/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
       });
-      return normalizeIncident(response);
+      const data = unwrapResponse(response);
+      const item = data?.incident || data?.item || data;
+      return normalizeIncident(item);
     }
     await new Promise((r) => setTimeout(r, 200));
     const items = getLocalStore();
@@ -205,40 +287,56 @@ export const incidentService = {
     }
 
     const current = items[index];
+    const oldStatus = current.status || 'Open';
+    const newStatus = patchData.status || oldStatus;
+
+    if (!STATUS_LIFECYCLE.includes(newStatus)) {
+      throw new Error('Invalid status');
+    }
+
+    const oldIndex = STATUS_LIFECYCLE.indexOf(oldStatus);
+    const newIndex = STATUS_LIFECYCLE.indexOf(newStatus);
+
+    // Strictly enforce backend transition rule: same status or one-step forward
+    if (newIndex < oldIndex || newIndex > oldIndex + 1) {
+      throw new Error('Invalid status transition');
+    }
+
+    const rawAssigned = patchData.assignedTo !== undefined ? patchData.assignedTo : patchData.assignee;
+    const assignedTo = rawAssigned !== undefined ? (typeof rawAssigned === 'string' ? rawAssigned.trim() : '') : (current.assignedTo || '');
+
+    if (newIndex >= 1 && !assignedTo) {
+      throw new Error('Assignment is required before progressing');
+    }
+
+    const rawRemarks = patchData.resolutionRemarks !== undefined ? patchData.resolutionRemarks : (current.resolutionRemarks || '');
+    const remarks = typeof rawRemarks === 'string' ? rawRemarks.trim() : '';
+
+    if ((newStatus === 'Resolved' || newStatus === 'Closed') && !remarks) {
+      throw new Error('Resolution remarks are required');
+    }
+
     const now = new Date().toISOString();
     const newTimeline = [...(current.timeline || [])];
 
-    const targetAssignee =
-      patchData.assignedTo ||
-      patchData.assignee ||
-      current.assignee ||
-      current.assignedTo ||
-      'Unassigned';
-
-    // If status changed, record to timeline
-    if (patchData.status && patchData.status !== current.status) {
+    // Status changes append a timeline entry
+    if (newStatus !== oldStatus) {
+      const entryText = newStatus === 'Resolved' && remarks ? remarks : `Status changed to ${newStatus}`;
       newTimeline.push({
+        status: newStatus,
         timestamp: now,
-        status: patchData.status,
-        actor: patchData.updatedBy || 'Campus Admin',
-        note: patchData.resolutionRemarks 
-          ? `Status changed to ${patchData.status}: ${patchData.resolutionRemarks}`
-          : `Status updated from ${current.status} to ${patchData.status}`,
-      });
-    } else if (patchData.resolutionRemarks && patchData.resolutionRemarks !== current.resolutionRemarks) {
-      newTimeline.push({
-        timestamp: now,
-        status: current.status,
-        actor: patchData.updatedBy || 'Campus Admin',
-        note: `Remarks updated: ${patchData.resolutionRemarks}`,
+        remarks: entryText,
+        note: entryText,
+        actor: 'System',
       });
     }
 
     const updated = {
       ...current,
-      ...patchData,
-      assignee: targetAssignee,
-      assignedTo: targetAssignee,
+      status: newStatus,
+      assignedTo,
+      assignee: assignedTo || 'Unassigned',
+      resolutionRemarks: remarks,
       timeline: newTimeline,
       updatedAt: now,
     };
@@ -254,32 +352,50 @@ export const incidentService = {
    */
   async getStats() {
     if (!USE_MOCK_DATA) {
-      const data = await apiClient('/stats', { method: 'GET' });
+      const response = await apiClient('/stats', { method: 'GET' });
+      const statsPayload = unwrapResponse(response) || {};
+      const resolvedCount = (statsPayload.resolved ?? 0) + (statsPayload.closed ?? 0);
+
       return {
-        total: data?.total ?? 0,
-        open: data?.open ?? 0,
-        inProgress: data?.inProgress ?? 0,
-        assigned: data?.assigned ?? 0,
-        resolved: data?.resolved ?? 0,
-        critical: data?.critical ?? 0,
-        categoryCounts: data?.categoryCounts ?? {},
-        priorityCounts: data?.priorityCounts ?? { Low: 0, Medium: 0, High: 0, Critical: 0 },
+        total: statsPayload.total ?? 0,
+        open: statsPayload.open ?? 0,
+        assigned: statsPayload.assigned ?? 0,
+        inProgress: statsPayload.inProgress ?? 0,
+        resolved: resolvedCount,
+        closed: statsPayload.closed ?? 0,
+        critical: statsPayload.critical ?? 0,
+        categoryCounts: statsPayload.categoryCounts || statsPayload.byCategory || {},
+        priorityCounts: statsPayload.priorityCounts || statsPayload.byPriority || { Low: 0, Medium: 0, High: 0, Critical: 0 },
+        byStatus: statsPayload.byStatus || {},
+        byPriority: statsPayload.byPriority || {},
+        byCategory: statsPayload.byCategory || {},
       };
     }
     const items = await this.getIncidents();
     const total = items.length;
     const open = items.filter((i) => i.status === 'Open').length;
-    const inProgress = items.filter((i) => i.status === 'In Progress').length;
     const assigned = items.filter((i) => i.status === 'Assigned').length;
-    const resolved = items.filter((i) => i.status === 'Resolved' || i.status === 'Closed').length;
+    const inProgress = items.filter((i) => i.status === 'In Progress').length;
+    const resolvedOnly = items.filter((i) => i.status === 'Resolved').length;
+    const closed = items.filter((i) => i.status === 'Closed').length;
+    const resolved = resolvedOnly + closed;
     const critical = items.filter((i) => i.priority === 'Critical').length;
 
-    // Categories breakdown
+    // Categories and priorities breakdown
     const categoryCounts = {};
     const priorityCounts = { Low: 0, Medium: 0, High: 0, Critical: 0 };
+    const byStatus = {
+      Open: open,
+      Assigned: assigned,
+      'In Progress': inProgress,
+      Resolved: resolvedOnly,
+      Closed: closed,
+    };
 
     items.forEach((inc) => {
-      categoryCounts[inc.category] = (categoryCounts[inc.category] || 0) + 1;
+      if (inc.category) {
+        categoryCounts[inc.category] = (categoryCounts[inc.category] || 0) + 1;
+      }
       if (priorityCounts[inc.priority] !== undefined) {
         priorityCounts[inc.priority] += 1;
       }
@@ -288,12 +404,16 @@ export const incidentService = {
     return {
       total,
       open,
-      inProgress,
       assigned,
+      inProgress,
       resolved,
+      closed,
       critical,
       categoryCounts,
       priorityCounts,
+      byStatus,
+      byPriority: priorityCounts,
+      byCategory: categoryCounts,
     };
   },
 

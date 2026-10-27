@@ -19,7 +19,7 @@ import { STATUSES } from '../data/mockIncidents';
 
 export default function AdminManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { incidents, updateIncident, loading } = useIncidents();
+  const { incidents, updateIncident, loading, showToast } = useIncidents();
 
   const urlId = searchParams.get('id');
 
@@ -43,7 +43,8 @@ export default function AdminManagement() {
   // Sync state whenever activeIncident changes
   useEffect(() => {
     if (activeIncident) {
-      setAssignee(activeIncident.assignee || '');
+      const currentAssignee = activeIncident.assignedTo || (activeIncident.assignee !== 'Unassigned' ? activeIncident.assignee : '') || '';
+      setAssignee(currentAssignee);
       setStatus(activeIncident.status || 'Open');
       setResolutionRemarks(activeIncident.resolutionRemarks || '');
     }
@@ -67,13 +68,31 @@ export default function AdminManagement() {
     e.preventDefault();
     if (!activeIncident) return;
 
+    const trimmedAssignee = assignee.trim();
+    const trimmedRemarks = resolutionRemarks.trim();
+
+    // Assignment required before progressing to Assigned or later
+    if (status !== 'Open' && (!trimmedAssignee || trimmedAssignee === 'Unassigned')) {
+      if (showToast) {
+        showToast('Assignment is required before progressing past Open.', 'error');
+      }
+      return;
+    }
+
+    // Resolution remarks required for Resolved and Closed
+    if ((status === 'Resolved' || status === 'Closed') && !trimmedRemarks) {
+      if (showToast) {
+        showToast(`Resolution remarks are required when marking incident as ${status}.`, 'error');
+      }
+      return;
+    }
+
     setSaving(true);
     try {
       await updateIncident(activeIncident.id, {
-        assignee: assignee.trim() || 'Unassigned',
+        assignedTo: trimmedAssignee,
         status,
-        resolutionRemarks: resolutionRemarks.trim(),
-        updatedBy: adminName.trim() || 'Campus Admin',
+        resolutionRemarks: trimmedRemarks,
       });
     } catch (err) {
       console.error(err);
@@ -259,17 +278,23 @@ export default function AdminManagement() {
                     Progress through lifecycle: <span className="font-semibold text-[#501B24]">Open → Assigned → In Progress → Resolved → Closed</span>
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    {STATUSES.map((st) => {
+                    {STATUSES.map((st, idx) => {
                       const isCurrent = status === st;
+                      const activeIndex = activeIncident ? STATUSES.indexOf(activeIncident.status) : 0;
+                      const isAllowed = idx === activeIndex || idx === activeIndex + 1;
                       return (
                         <button
                           type="button"
                           key={st}
+                          disabled={!isAllowed}
                           onClick={() => setStatus(st)}
+                          title={!isAllowed ? `Status can only transition one step forward: ${STATUSES[activeIndex + 1] || 'None'}` : ''}
                           className={`py-2.5 px-2 rounded-xl text-xs font-bold uppercase tracking-wider text-center border transition-all ${
                             isCurrent
                               ? 'bg-[#501B24] text-[#EAC4CF] border-[#651F2B] shadow-sm ring-2 ring-[#EAC4CF]'
-                              : 'bg-white text-[#501B24] border-[#DCCBBC] hover:bg-[#FAF0F2]'
+                              : isAllowed
+                              ? 'bg-white text-[#501B24] border-[#DCCBBC] hover:bg-[#FAF0F2] cursor-pointer'
+                              : 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed opacity-50'
                           }`}
                         >
                           {st}

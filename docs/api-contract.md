@@ -1,8 +1,8 @@
 # CloudIncident — API Gateway Contract Specification
 **Target Backend:** AWS API Gateway + AWS Lambda + Amazon DynamoDB  
 **Consumer:** CloudIncident React Frontend (`frontend/src`)  
-**Status:** PROPOSED & READY FOR BACKEND REVIEW  
-**Date:** October 2026  
+**Status:** AGREED & FINALIZED FOR BACKEND INTEGRATION  
+**Date:** October 2026 (Updated per backend architecture alignment)  
 **Document Location:** `docs/api-contract.md`
 
 ---
@@ -24,13 +24,14 @@ This document specifies the REST API contract between the **CloudIncident Fronte
                                                            └──────────┬───────────┘
                                                                       │ CRUD
                                                                       ▼
-                                                           ┌──────────────────────┐
-                                                           │   Amazon DynamoDB    │
-                                                           │   (Incidents Table)  │
-                                                           └──────────────────────┘
+                                                           ┌───────────────────────────┐
+                                                           │      Amazon DynamoDB      │
+                                                           │ `CloudIncident-Incidents` │
+                                                           └───────────────────────────┘
 ```
 
 ### Environment & Integration Configuration
+- **DynamoDB Target Table:** `CloudIncident-Incidents` (Partition Key: `incidentId`).
 - **Base URL Setting:** Configured via `VITE_API_BASE_URL` in `frontend/.env` (e.g., `https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod`).
 - **Mock Mode Toggle:** Controlled via `VITE_USE_MOCK_DATA`.
   - When `true` (default): Frontend reads from and writes to browser `localStorage` with mock delay.
@@ -45,7 +46,7 @@ The primary data entity is the **Incident**. Based on the frontend data model an
 
 | Attribute | Type | DynamoDB Type | Frontend Usage | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `incidentId` | `string` | `S` (Partition Key) | UI maps `id` / `incidentId` | Unique ticket identifier (e.g., `"INC-1048"`). |
+| `incidentId` | `string` | `S` (Partition Key) | UI maps `id` / `incidentId` | Unique ticket identifier (UUID format, e.g., `"3fa85f64-5717-4562-b3fc-2c963f66afa6"`). |
 | `title` | `string` | `S` | Required in forms & lists | High-level summary of the incident (min 6 chars). |
 | `description` | `string` | `S` | Detailed triage card | Full incident description (min 15 chars). |
 | `category` | `string` | `S` | Tagged badge & filter | Domain category (e.g., `"Network"`, `"IT Equipment"`). |
@@ -111,7 +112,7 @@ Returns the complete initialized incident record with server-generated fields (`
 **Example Response:**
 ```json
 {
-  "incidentId": "INC-1049",
+  "incidentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "title": "Core Switch Fiber Uplink Failure — CS Block B",
   "description": "The primary 10Gbps fiber uplink on the second floor rack disconnected unexpectedly. Computer Science labs are operating on high-latency fallback.",
   "category": "Network",
@@ -169,7 +170,7 @@ The frontend service adapter supports either a direct array `[...]` or a wrapped
 ```json
 [
   {
-    "incidentId": "INC-1048",
+    "incidentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "title": "Core Switch Fiber Uplink Failure — CS Block B",
     "description": "The primary 10Gbps fiber uplink on the second floor rack disconnected unexpectedly.",
     "category": "Network",
@@ -203,7 +204,7 @@ The frontend service adapter supports either a direct array `[...]` or a wrapped
     ]
   },
   {
-    "incidentId": "INC-1047",
+    "incidentId": "8f3b2a1c-9d4e-4b7a-bc12-5e6f7a8b9c0d",
     "title": "HVAC Chiller Leak Threatening Server Rack 3",
     "description": "Ceiling condensation and line leakage observed directly above Rack 3.",
     "category": "Infrastructure",
@@ -234,11 +235,11 @@ Retrieves the complete detail record and transition timeline for a specific inci
 - **Method:** `GET`
 - **Path:** `/incidents/{id}`
 - **Path Parameter:**
-  - `id` (`string`, required): The unique ticket ID (e.g., `INC-1048`). Lookups should be case-insensitive (or normalized to uppercase).
+  - `id` (`string`, required): The unique ticket ID (UUID format, e.g., `3fa85f64-5717-4562-b3fc-2c963f66afa6`). Lookups should be case-insensitive (or normalized to lowercase).
 
 **Example Request:**
 ```http
-GET /incidents/INC-1048 HTTP/1.1
+GET /incidents/3fa85f64-5717-4562-b3fc-2c963f66afa6 HTTP/1.1
 Host: api.example.com
 Accept: application/json
 ```
@@ -250,7 +251,7 @@ Accept: application/json
 **Example Response:**
 ```json
 {
-  "incidentId": "INC-1048",
+  "incidentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "title": "Core Switch Fiber Uplink Failure — CS Block B",
   "description": "The primary 10Gbps fiber uplink on the second floor rack disconnected unexpectedly. All research laboratories and computer labs in Block B are currently operating on high-latency fallback or without LAN access.",
   "category": "Network",
@@ -290,7 +291,7 @@ Accept: application/json
 ```json
 {
   "error": "NOT_FOUND",
-  "message": "Incident with ID 'INC-9999' was not found.",
+  "message": "Incident with ID '3fa85f64-5717-4562-b3fc-2c963f66afa6' was not found.",
   "statusCode": 404
 }
 ```
@@ -305,7 +306,7 @@ Updates mutable operational fields of an existing incident. Invoked by `AdminMan
 - **Method:** `PATCH`
 - **Path:** `/incidents/{id}`
 - **Path Parameter:**
-  - `id` (`string`, required): Incident ID to update.
+  - `id` (`string`, required): Incident UUID to update.
 - **Headers:** `Content-Type: application/json`
 
 **Payload Schema:**
@@ -348,7 +349,7 @@ Updates mutable operational fields of an existing incident. Invoked by `AdminMan
 **Example Response:**
 ```json
 {
-  "incidentId": "INC-1048",
+  "incidentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "title": "Core Switch Fiber Uplink Failure — CS Block B",
   "description": "The primary 10Gbps fiber uplink on the second floor rack disconnected unexpectedly.",
   "category": "Network",
@@ -475,7 +476,7 @@ Returns aggregated metrics required for `Dashboard.jsx`, the 4 hero stat cards, 
 | `status` | PATCH `/incidents/{id}` | Optional. If provided, must match one of the 5 status enums. | `400 Bad Request` ("Invalid status state.") |
 | `assignedTo` | PATCH `/incidents/{id}` | Optional. Trimmed string, max 100 characters. | `400 Bad Request` |
 | `resolutionRemarks` | PATCH `/incidents/{id}` | Optional. String, max 2000 characters. | `400 Bad Request` |
-| `id` / `incidentId` | Path param | Valid ID format matching `^INC-[A-Za-z0-9_-]+$`. | `400 Bad Request` / `404 Not Found` |
+| `id` / `incidentId` | Path param | Valid UUID format matching `^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$` (standard RFC 4122 UUID). | `400 Bad Request` / `404 Not Found` |
 
 ### Allowed Enumerations
 
@@ -545,10 +546,11 @@ To provide actionable messages to both the UI error toast and debug modal, the b
 ## 6. Identifiers, Formatting, and Conventions
 
 ### 6.1 Incident ID Format
-- **Format:** `INC-<number>` (e.g., `INC-1048`, `INC-1049`).
-- **Regular Expression:** `^INC-[A-Za-z0-9_-]+$`
-- **Case Sensitivity:** Lookups in API Gateway should handle case-insensitively or convert `{id}` to uppercase (e.g., `inc-1048` → `INC-1048`).
-- **Proposed DynamoDB ID Strategy:** In a distributed serverless environment, generating sequential IDs requires an atomic counter item. Alternatively, a short alphanumeric hash (`INC-8A42F`) or UUID prefix can be agreed upon.
+- **Agreed Decision:** UUID-based ticket identifiers.
+- **Proposed Specification:** Standard RFC 4122 UUID v4 format (36-character canonical lowercase hexadecimal string with hyphens: `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`, e.g., `3fa85f64-5717-4562-b3fc-2c963f66afa6`).
+- **Regular Expression:** `^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`
+- **Case Sensitivity & Normalization:** Lookups in API Gateway / Lambda handlers should handle UUIDs case-insensitively or convert to canonical lowercase prior to DynamoDB key querying.
+- **DynamoDB Keying:** Stored under the primary partition key attribute `incidentId` (`S`) in the `CloudIncident-Incidents` table.
 
 ### 6.2 Timestamp Format
 - **Specification:** ISO 8601 UTC format (`YYYY-MM-DDTHH:mm:ssZ` or `YYYY-MM-DDTHH:mm:ss.sssZ`).
@@ -577,48 +579,54 @@ An `OPTIONS` mock integration must be defined on `/incidents`, `/incidents/{id}`
 
 ## 8. Confirmation & Agreement Matrix
 
-To ensure clear ownership between frontend and backend developers, the table below highlights what is already established and what requires mutual agreement:
+To ensure seamless integration between frontend and backend developers, the table below documents agreed decisions and open implementation questions:
 
-### 8.1 Confirmed by Existing Frontend Implementation
-- [x] **5 Target Endpoints:** `POST /incidents`, `GET /incidents`, `GET /incidents/{id}`, `PATCH /incidents/{id}`, `GET /stats`.
-- [x] **Creation Payload Fields:** `title`, `description`, `category`, `location`, `priority`, `reportedBy`.
-- [x] **Validation Minimum Lengths:** `title` (>= 6 chars), `description` (>= 15 chars), non-empty `location`, non-empty `reportedBy`.
-- [x] **Category Enum Set:** `["IT Equipment", "Network", "Infrastructure", "Maintenance", "Safety", "Other"]`.
-- [x] **Priority Enum Set:** `["Low", "Medium", "High", "Critical"]`.
-- [x] **Status Enum Set:** `["Open", "Assigned", "In Progress", "Resolved", "Closed"]`.
-- [x] **Default Creation Status:** Always starts as `"Open"`.
+### 8.1 Agreed Decisions & Confirmed Specifications
+- [x] **DynamoDB Table Name:** `CloudIncident-Incidents`.
+- [x] **DynamoDB Partition Key:** `incidentId` (`S`).
+- [x] **Assignee Field Name:** `assignedTo` (`S`).
+- [x] **History Field Name:** `timeline` (`L` of maps with `{ timestamp, status, actor, note }`).
+- [x] **ID Format:** UUID-based (replacing sequential `INC-xxxx` IDs).
+- [x] **Target Routes (5):**
+  - `POST /incidents`
+  - `GET /incidents`
+  - `GET /incidents/{id}`
+  - `PATCH /incidents/{id}`
+  - `GET /stats`
+- [x] **Status Lifecycle (5 States):** `Open` → `Assigned` → `In Progress` → `Resolved` → `Closed`.
+- [x] **Initial Status on Creation:** Always starts as `"Open"`.
 - [x] **Stats Metrics Schema:** Keys `total`, `open`, `inProgress`, `assigned`, `resolved`, `critical`, `categoryCounts`, `priorityCounts` are required for dashboard rendering.
 - [x] **Audit Timeline Structure:** Array of objects with `{ timestamp, status, actor, note }`.
-- [x] **Error Body Parsing:** Expects JSON containing a `.message` or `.error` property.
+- [x] **Error Response Envelope:** Expects JSON containing `.message` (or `.errorMessage` / `.error`).
 
-### 8.2 Proposed Conventions Requiring Backend Teammate Agreement
-- [ ] **ID Attribute Name (`incidentId` vs `id`):** Frontend normalized to handle both. Teammate to confirm DynamoDB partition key name (proposed: `incidentId`).
-- [ ] **Assignee Attribute Name (`assignedTo` vs `assignee`):** Frontend normalized to handle both. Teammate to confirm DynamoDB attribute name (proposed: `assignedTo`).
-- [ ] **ID Generation Strategy:** Sequential integer (`INC-1049` via atomic counter) vs alphanumeric hash / UUID (e.g., `INC-8F12B`).
-- [ ] **List Response Format:** Direct JSON array `[...]` vs wrapped object `{"incidents": [...], "count": N, "nextToken": "..."}`.
-- [ ] **Server-Side Query Filtering:** Confirmation of whether Lambda will handle `?status=...&category=...` or if frontend continues client-side filtering.
-- [ ] **Audit Timeline Ownership:** Confirmation that Lambda automatically creates initial timeline event on `POST` and appends transition event on `PATCH`.
-- [ ] **Actor Identification on PATCH:** Whether `updatedBy` is supplied in the request body (current UI behavior) or extracted from AWS Cognito / API Gateway request context.
-- [ ] **Authentication / Authorization:** Whether API Key (`x-api-key`) or AWS Cognito JWT tokens (`Authorization: Bearer <token>`) will be required for `/prod`.
+### 8.2 Questions Requiring Backend Developer Confirmation Before Live Integration
+- [ ] **Exact UUID Generator / Format:** Does Lambda generate standard lowercase RFC 4122 v4 UUIDs (e.g., `3fa85f64-5717-4562-b3fc-2c963f66afa6`) via Node `crypto.randomUUID()` / `uuidv4()`, or does it prepend a prefix (e.g., `INC-...`)?
+- [ ] **`GET /incidents` List-Response Shape:** Does Lambda return a direct JSON array `[...]` or an envelope object (e.g., `{"incidents": [...]}` or `{"items": [...]}`)?
+- [ ] **List Pagination:** Does `GET /incidents` paginate results (e.g. `limit` and `nextToken` / `LastEvaluatedKey`), or return all incidents in the table? If paginated, does the backend support fetching all records or pass a pagination cursor?
+- [ ] **Single Incident Response Envelope:** Do `GET /incidents/{id}`, `POST /incidents`, and `PATCH /incidents/{id}` return the incident object directly at root (`{ "incidentId": "...", ... }`), or wrapped in `{"incident": {...}}` / `{"item": {...}}`?
+- [ ] **`GET /stats` Endpoint Implementation:** Is `GET /stats` actively deployed as a dedicated Lambda route? Does `categoryCounts` contain keys for all 6 categories (with 0 if no incidents exist), and does `priorityCounts` contain all 4 priorities (`Low`, `Medium`, `High`, `Critical`)?
+- [ ] **Server-Side Filtering on `GET /incidents`:** Does Lambda execute DynamoDB query/filter expressions for `?status=...&category=...&priority=...&search=...`, or is filtering left to the client?
+- [ ] **Timeline Creation & Mutation Ownership:** Does Lambda automatically generate the initial `timeline` event on `POST /incidents` and append transition events on `PATCH /incidents/{id}`? Is `updatedBy` accepted from the PATCH body for actor attribution?
+- [ ] **CORS Configuration on API Gateway:** Are CORS headers (`Access-Control-Allow-Origin: *` or allowed origins, `Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS`, and `Access-Control-Allow-Headers`) and mock `OPTIONS` integrations deployed for all 5 routes?
+- [ ] **Authentication / Authorization:** Does `/prod` require an API Key (`x-api-key`), AWS IAM signature, or Cognito JWT token (`Authorization: Bearer <token>`)?
 
 ---
 
-## 9. Frontend Compatibility & Reported Inconsistencies
+## 9. Frontend Compatibility & Service Layer Mapping
 
-During code inspection and build verification (`npm run build`), the following potential inconsistencies between the raw UI mock code and the target backend contract were detected and resolved in the frontend service layer:
+The frontend service layer (`frontend/src/services/incidentService.js` and `frontend/src/services/api.js`) bridges UI conventions and backend DynamoDB specifications:
 
-1. **`id` vs `incidentId` Property Mismatch:**
-   - *Inconsistency:* The UI templates (`IncidentTable.jsx`, `IncidentDetails.jsx`, `AdminManagement.jsx`) referenced `.id`, whereas the proposed data model specification defines `incidentId`.
-   - *Resolution:* Added `normalizeIncident()` in `frontend/src/services/incidentService.js` that maps `id: inc.incidentId || inc.id` and `incidentId: inc.incidentId || inc.id`.
-2. **`assignee` vs `assignedTo` Field Mismatch:**
-   - *Inconsistency:* The UI forms and badges referenced `.assignee`, whereas the proposed backend model specifies `assignedTo`.
-   - *Resolution:* Normalized both properties in `incidentService.js` so both outgoing and incoming payloads support `assignedTo` and `assignee` simultaneously.
+1. **`id` vs `incidentId` Property Normalization:**
+   - *Mapping:* `normalizeIncident()` guarantees that both `.id` and `.incidentId` point to the ticket identifier across all components.
+2. **`assignee` vs `assignedTo` Request Sanitization:**
+   - *Mapping:* When dispatching `POST /incidents` and `PATCH /incidents/{id}`, the service layer maps frontend `assignee` to `assignedTo` and strips `assignee` from outgoing wire payloads, ensuring strict conformance with the agreed DynamoDB schema.
 3. **`timeline` Array Persistence:**
-   - *Inconsistency:* The 12-field starting model did not explicitly list `timeline`, but `IncidentDetails.jsx` relies on `incident.timeline` to render the transition history.
-   - *Resolution:* Documented `timeline` as a supplemental list attribute and preserved fallback defaults in `normalizeIncident`.
-4. **GET `/incidents` Query Parameter Construction:**
-   - *Inconsistency:* `incidentService.getIncidents()` previously accepted no arguments, whereas the contract specifies query parameters (`status`, `category`, `priority`, `search`).
-   - *Resolution:* Updated `incidentService.getIncidents(filters)` to serialize query parameters when `VITE_USE_MOCK_DATA=false`.
-5. **Dashboard Statistics Safeguards:**
-   - *Inconsistency:* `Dashboard.jsx` calculates `inProgressCount = stats.inProgress + (stats.assigned || 0)`. If the backend returns partial stats, `undefined` addition could cause `NaN`.
-   - *Resolution:* Added fallback default values in `incidentService.getStats()` ensuring all keys default to `0` or empty objects.
+   - *Mapping:* Documented `timeline` as the official history attribute; `normalizeIncident` ensures fallback to `[]` if undefined.
+4. **List Response Flexibility:**
+   - *Mapping:* `incidentService.getIncidents()` unpacks direct arrays (`[...]`), `{ incidents: [...] }`, `{ items: [...] }`, or `{ data: [...] }`.
+5. **Single Incident Response Flexibility:**
+   - *Mapping:* `incidentService.getIncidentById()` unpacks direct root objects, `{ incident: {...} }`, or `{ item: {...} }`.
+6. **Dashboard Statistics Safeguards:**
+   - *Mapping:* `incidentService.getStats()` provides fallback defaults ensuring all keys default to `0` or empty objects to prevent `NaN` during UI aggregation.
+7. **UUID-Based Mock Generation:**
+   - *Mapping:* Local mock mode generates RFC-compliant UUIDs via `crypto.randomUUID()` to mirror production backend behavior.
