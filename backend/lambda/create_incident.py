@@ -86,10 +86,7 @@ def lambda_handler(event, context):
             201,
             True,
             "Incident created successfully",
-            {
-                "incidentId": incident_id,
-                "status": "Open"
-            }
+            incident
         )
 
     except (json.JSONDecodeError, TypeError):
